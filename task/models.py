@@ -5,6 +5,7 @@ import uuid
 
 class Status(models.TextChoices):
     PENDING = "Pending"
+    RUNNING = "Running"
     FAILURE = "Failure"
     CONCLUDED = "Concluded"
 
