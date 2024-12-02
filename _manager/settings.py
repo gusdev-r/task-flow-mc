@@ -27,8 +27,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+AUTH_USER_MODEL = "user.User"
 
 # Application definition
+APPS = ["user", "task", "task_logs", "notifications"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -37,7 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-]
+] + APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
