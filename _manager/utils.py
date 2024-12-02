@@ -1,6 +1,8 @@
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.request import Request
+from django.urls import reverse
+from django.http import HttpRequest
 
 
 def response_app(data, status_code=200, exception=False, obj=None, links=None):
@@ -17,25 +19,47 @@ def response_app(data, status_code=200, exception=False, obj=None, links=None):
 
 
 def generate_hateoas_links(
-    request: Request, resource_name: str, obj_id: int, request_type
+    request: HttpRequest, resource_name: str, obj_id: str, request_type: str
 ) -> dict:
-    base_url = request.build_absolute_uri(f"/{resource_name}/")
+    base_url = request.build_absolute_uri(reverse(f"{resource_name}-list"))
+    create_uri = request.build_absolute_uri(reverse(f"{resource_name}-create"))
+    delete_uri = request.build_absolute_uri(
+        reverse(f"{resource_name}-delete", args=[obj_id])
+    )
+    update_uri = request.build_absolute_uri(
+        reverse(f"{resource_name}-update", args=[obj_id])
+    )
+    detail_uri = request.build_absolute_uri(
+        reverse(f"{resource_name}-detail", args=[obj_id])
+    )
+
     links = {}
 
-    if request_type == "get":
-        links["self"] = f"{base_url}{obj_id}/"
-        links["update"] = f"{base_url}{obj_id}/update/"
-        links["delete"] = f"{base_url}{obj_id}/delete/"
+    if request_type == "get" and obj_id:
+        links["self"] = detail_uri
+        links["search_all"] = base_url
+        links["update"] = update_uri
+        links["delete"] = delete_uri
+        links["create"] = create_uri
+
+    elif request_type == "get":
+        links["self"] = base_url
+        links["create"] = create_uri
 
     elif request_type == "post":
-        links["self"] = f"{base_url}{obj_id}/"
-        links["list"] = f"{base_url}"
+        links["self"] = create_uri
+        links["update"] = update_uri
+        links["search"] = detail_uri
+        links["list"] = base_url
 
     elif request_type == "put":
-        links["self"] = f"{base_url}{obj_id}/"
-        links["delete"] = f"{base_url}{obj_id}/delete/"
+        links["self"] = update_uri
+        links["search"] = detail_uri
+        links["search_all"] = base_url
+        links["delete"] = delete_uri
 
     elif request_type == "delete":
-        links["self"] = f"{base_url}{obj_id}/"
+        links["self"] = delete_uri
+        links["search_all"] = base_url
 
     return links
