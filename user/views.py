@@ -5,7 +5,6 @@ from .models import User
 from _manager.utils import generate_hateoas_links, response_app
 from rest_framework import generics
 from rest_framework.views import status
-from rest_framework.response import Response
 
 
 class UsersListView(APIView):
@@ -30,9 +29,8 @@ class UsersListActiveView(APIView):
         links = generate_hateoas_links(
             request=request, resource_name="user", request_type="get"
         )
-
         return response_app(
-            data="List of users retrieved successfully",
+            data="List of active users retrieved successfully",
             obj=serializer.data,
             links=links,
         )
@@ -68,27 +66,11 @@ class UsersCreateView(generics.CreateAPIView):
                 data=str(exc),
             )
 
-    def options(self, request, *args, **kwargs):
-        allowed_methods = self.get_allowed_methods()
-        response = Response(
-            {
-                "message": "The allowed method for this route is POST.",
-                "allowed_methods": allowed_methods,
-            }
-        )
-        response["Allow"] = ", ".join(allowed_methods)
-        return response
-
-    def get_allowed_methods(self):
-        return ["POST"]
-
 
 class UserDetailView(APIView):
     def get(self, request, user_id, *args, **kwargs):
-        print(user_id)
         try:
             user = User.objects.get(id=user_id)
-
         except User.DoesNotExist:
             return response_app(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -146,7 +128,9 @@ class UserDeleteView(APIView):
                 "User not found", status_code=status.HTTP_404_NOT_FOUND, exception=True
             )
         user.delete()
-        links = generate_hateoas_links(request, "user", user_id, request_type="delete")
+        links = generate_hateoas_links(
+            request=request, resource_name="user", obj_id=user_id, request_type="delete"
+        )
 
         return response_app(
             status_code=status.HTTP_204_NO_CONTENT,
