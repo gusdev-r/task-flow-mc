@@ -1,20 +1,19 @@
 from django.shortcuts import render
 from rest_framework import generics
-from .serializers import TaskSerializer
-from .models import Task, TaskConfig
+from .serializers import TaskSerializer, TaskUpdateSerializer
+from .models import Task, TaskConfig, Status
 from rest_framework.views import status
 from _manager.utils import generate_hateoas_links, response_app
 from rest_framework.views import APIView
 
 
-class TaskListAllView(APIView):
-    serializer_class = TaskSerializer
-    queryset = Task.objects.all()
-
+class TaskListView(APIView):
     def get(self, request):
-        tasks = self.get_queryset()
-        serializer = self.get_serializer(tasks, many=True)
-        links = generate_hateoas_links(request, "tasks", request_type="get")
+        tasks = Task.objects.all()
+        serializer = TaskSerializer(tasks, many=True)
+        links = generate_hateoas_links(
+            request=request, resource_name="task", obj_id=None, request_type="get"
+        )
 
         return response_app(
             data="List of tasks retrieved successfully",
@@ -23,10 +22,31 @@ class TaskListAllView(APIView):
         )
 
 
+class TaskListByStatusView(APIView):
+    def get(self, request):
+        status_filter = request.query_params.get("status", None)
+        if status_filter not in Status.values:
+            return response_app(
+                data=f"Invalid status '{status_filter}'. Allowed values: {', '.join(Status.values)}",
+                obj=[],
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        tasks = Task.objects.filter(status=status_filter)
+        serializer = TaskSerializer(tasks, many=True)
+        links = generate_hateoas_links(
+            request=request, resource_name="task", request_type="get"
+        )
+        return response_app(
+            data=f"List of {status_filter} tasks retrieved successfully",
+            obj=serializer.data,
+            links=links,
+        )
+
+
 class TaskDetailView(APIView):
-    def get(self, request, id, *args, **kwargs):
+    def get(self, request, task_id, *args, **kwargs):
         try:
-            task = Task.objects.get(id=id)
+            task = Task.objects.get(id=task_id)
         except Task.DoesNotExist:
             return response_app(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -36,7 +56,7 @@ class TaskDetailView(APIView):
 
         serializer = TaskSerializer(task)
         links = generate_hateoas_links(
-            request=request, resource_name="tasks", id=task.id, request_type="get"
+            request=request, resource_name="task", obj_id=task_id, request_type="get"
         )
 
         return response_app(
@@ -50,13 +70,14 @@ class TaskCreateView(generics.CreateAPIView):
     serializer_class = TaskSerializer
 
     def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
             links = generate_hateoas_links(
                 request=request,
-                resource_name="tasks",
-                id=serializer.data.id,
+                resource_name="task",
+                obj_id=serializer.data.get("id"),
                 request_type="post",
             )
             return response_app(
@@ -65,21 +86,29 @@ class TaskCreateView(generics.CreateAPIView):
                 obj=serializer.data,
                 links=links,
             )
-        return response_app(
-            status_code=status.HTTP_400_BAD_REQUEST, exception=True, data="Invalid data"
-        )
+        except Exception as exc:
+            return response_app(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                exception=True,
+                data=str(exc),
+            )
 
 
 class TaskDeleteView(APIView):
-    def delete(self, request, id, *args, **kwargs):
+    def delete(self, request, task_id, *args, **kwargs):
         try:
-            task = Task.objects.get(id=id)
+            task = Task.objects.get(id=task_id)
         except Task.DoesNotExist:
             return response_app(
                 "Task not found", status_code=status.HTTP_404_NOT_FOUND, exception=True
             )
         task.delete()
-        links = generate_hateoas_links(request, "tasks", id, request_type="delete")
+        links = generate_hateoas_links(
+            request=request,
+            resource_name="task",
+            obj_id=task_id,
+            request_type="delete",
+        )
 
         return response_app(
             status_code=status.HTTP_204_NO_CONTENT,
@@ -89,18 +118,22 @@ class TaskDeleteView(APIView):
 
 
 class TaskUpdateView(APIView):
-    def put(self, request, id, *args, **kwargs):
+    def put(self, request, task_id, *args, **kwargs):
         try:
-            task = Task.objects.get(id=id)
+            task = Task.objects.get(id=task_id)
         except Task.DoesNotExist:
             return response_app(
                 "Task not found", status_code=status.HTTP_404_NOT_FOUND, exception=True
             )
-        serializer = TaskSerializer(task, data=request.data)
-        if serializer.is_valid():
+        serializer = TaskUpdateSerializer(task, data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
             task = serializer.save()
             links = generate_hateoas_links(
-                request, "tasks", task.id, request_type="put"
+                request=request,
+                resource_name="task",
+                obj_id=task.id,
+                request_type="put",
             )
 
             return response_app(
@@ -109,6 +142,7 @@ class TaskUpdateView(APIView):
                 obj=serializer.data,
                 links=links,
             )
-        return response_app(
-            status_code=status.HTTP_400_BAD_REQUEST, exception=True, data="Invalid data"
-        )
+        except Exception as exc:
+            return response_app(
+                status_code=status.HTTP_400_BAD_REQUEST, exception=True, data=str(exc)
+            )
