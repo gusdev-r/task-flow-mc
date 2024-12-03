@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.request import Request
 from django.urls import reverse
 from django.http import HttpRequest
+from rest_framework.views import APIView
 
 
 def response_app(data, status_code=200, exception=False, obj=None, links=None):
@@ -19,7 +20,10 @@ def response_app(data, status_code=200, exception=False, obj=None, links=None):
 
 
 def generate_hateoas_links(
-    request: HttpRequest, resource_name: str, obj_id: str, request_type: str
+    request: HttpRequest,
+    resource_name: str = None,
+    obj_id: str = None,
+    request_type: str = None,
 ) -> dict:
     base_url = request.build_absolute_uri(reverse(f"{resource_name}-list"))
     create_uri = request.build_absolute_uri(reverse(f"{resource_name}-create"))
