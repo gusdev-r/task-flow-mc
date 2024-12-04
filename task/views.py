@@ -1,6 +1,6 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from rest_framework import generics
-from .serializers import TaskSerializer, TaskUpdateSerializer
+from .serializers import TaskConfigSerializer, TaskSerializer, TaskUpdateSerializer
 from .models import Task, TaskConfig, Status
 from rest_framework.views import status
 from _manager.utils import generate_hateoas_links, response_app
@@ -145,4 +145,81 @@ class TaskUpdateView(APIView):
         except Exception as exc:
             return response_app(
                 status_code=status.HTTP_400_BAD_REQUEST, exception=True, data=str(exc)
+            )
+
+
+class TaskConfigList(APIView):
+    def get(self, request):
+        tasks_config = TaskConfig.objects.all()
+        serializer = TaskConfigSerializer(tasks_config, many=True)
+        links = generate_hateoas_links(
+            request=request, resource_name="task", obj_id=None, request_type="get"
+        )
+
+        return response_app(
+            data="List of tasks configs retrieved successfully",
+            obj=serializer.data,
+            links=links,
+        )
+
+
+class TaskConfigDeleteView(APIView):
+    def delete(self, request, task_id, *args, **kwargs):
+        try:
+            task_config = TaskConfig.objects.get(id=task_id)
+        except Task.DoesNotExist:
+            return response_app(
+                "Task config not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+                exception=True,
+            )
+        task_config.delete()
+        links = generate_hateoas_links(
+            request=request,
+            resource_name="task",
+            obj_id=task_id,
+            request_type="delete",
+        )
+
+        return response_app(
+            status_code=status.HTTP_204_NO_CONTENT,
+            data="Task config deleted successfully",
+            links=links,
+        )
+
+
+class TaskConfigCreateView(generics.CreateAPIView):
+    serializer_class = TaskConfigSerializer
+
+    def post(self, request, *args, **kwargs):
+        try:
+            task_id = self.kwargs.get("task_id")
+            task = get_object_or_404(Task, id=task_id)
+
+            mutable_data = request.data.copy()
+            mutable_data["task"] = task.id
+            serializer = self.get_serializer(data=mutable_data)
+            serializer.is_valid(raise_exception=True)
+            config, created = TaskConfig.objects.update_or_create(
+                task=task, defaults=serializer.validated_data
+            )
+            status_message = "created" if created else "updated"
+            links = generate_hateoas_links(
+                request=request,
+                resource_name="task",
+                obj_id=task.id,
+                request_type="post",
+            )
+
+            return response_app(
+                status_code=status.HTTP_201_CREATED,
+                data=f"Task configuration {status_message} successfully.",
+                obj=serializer.data,
+                links=links,
+            )
+        except Exception as exc:
+            return response_app(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                exception=True,
+                data=str(exc),
             )
