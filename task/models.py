@@ -24,5 +24,5 @@ class Task(models.Model):
 class TaskConfig(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="task")
-    config_key = models.CharField(max_length=200)
+    config_key = models.CharField(max_length=50)
     config_value = models.JSONField()
